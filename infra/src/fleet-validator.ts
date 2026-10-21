@@ -1,7 +1,8 @@
 // Bundles validate-fleet.ts, the one implementation of the fleet contract, into the single
-// JavaScript file the reconciler runs on the host. The bundle carries the yaml dependency, so the
-// host needs only a root-owned, pinned bun. bun's bundler output is reproducible, so an unchanged
-// validator keeps its SHA-256 and your infrastructure installs nothing new.
+// JavaScript file the reconciler runs on the host. The bundle carries the yaml dependency and the
+// reviewed lists in fleet-contract.ts, so the host needs only the root-owned, pinned bun the
+// bootstrap installs. bun's bundler output is reproducible, so an unchanged validator keeps its
+// SHA-256 and Pulumi uploads nothing new.
 
 export async function bundleFleetValidator(): Promise<string> {
   const result = await Bun.build({

@@ -1,5 +1,5 @@
 {
-  "name": "dodo-teammate",
+  "name": "dodo-teammate-infra",
   "version": "0.1.0",
   "private": true,
   "packageManager": "bun@1.3.14",
@@ -9,8 +9,7 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "fleet": "bun run src/validate-fleet.ts",
-    "test": "bun test"
+    "check": "bun run format:check && bun run lint && bun run typecheck && bun run audit"
   },
   "dependencies": {
     "yaml": "2.8.1"

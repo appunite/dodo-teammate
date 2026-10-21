@@ -42,7 +42,7 @@ agent:
 # Unattended runs refuse every dangerous command.
 approvals:
   cron_mode: deny
-timezone: UTC
+timezone: Etc/UTC
 mcp_servers: {}
 # Exactly the plugins this profile ships; an absent key would let Hermes keep installed ones
 # (Dodo: profiles/*/config.yaml).
@@ -50,7 +50,7 @@ plugins:
   enabled: []
 skills:
   external_dirs:
-    - /var/lib/hermes/.myagent-deployment/skills/myagent-scheduled
+    - /var/lib/hermes/.dodo-deployment/dodo-skills/myagent-scheduled
 security:
   redact_secrets: true
 # Nobody can message this profile; it only switches link previews off for its deliveries.

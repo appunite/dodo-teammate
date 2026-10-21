@@ -45,7 +45,7 @@ plugins:
   enabled: []
 skills:
   external_dirs:
-    - /var/lib/hermes/.myagent-deployment/skills/myagent-admin
+    - /var/lib/hermes/.dodo-deployment/dodo-skills/myagent-admin
 security:
   redact_secrets: true
 slack:
@@ -55,6 +55,7 @@ slack:
   # A channel that does not exist: the adapter drops every event that is not a 1:1 DM
   # (Dodo: profiles/derek-admin/config.yaml).
   allowed_channels: [C0000000000]
+  allow_bots: none
   require_mention: true
   unfurl_links: false
   unfurl_media: false

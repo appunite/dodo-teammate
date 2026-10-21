@@ -48,4 +48,4 @@ answers; everyone else is ignored by design. MyAgent keeps no memory between con
 ## How to ask for a change
 
 Describe the change to the owner, or open a pull request on MyAgent's repository with a capability
-spec (`docs/capabilities/TEMPLATE.md`).
+spec (`docs/myagent-capabilities/capabilities/TEMPLATE.md`).

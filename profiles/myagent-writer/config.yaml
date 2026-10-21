@@ -53,10 +53,10 @@ plugins:
   enabled: [myagent-worker-guard]
 skills:
   external_dirs:
-    - /var/lib/hermes/.myagent-deployment/skills/myagent-writer
+    - /var/lib/hermes/.dodo-deployment/dodo-skills/myagent-writer
 security:
   redact_secrets: true
-# file runs on the host as hermes, in the task's workspace. No container: see docs/accepted-risks.md.
+# file runs on the host as hermes, in the task's workspace. No container: see docs/myagent-capabilities/accepted-risks.md.
 terminal:
   backend: local
   home_mode: auto

@@ -43,7 +43,7 @@ plugins:
   enabled: []
 skills:
   external_dirs:
-    - /var/lib/hermes/.myagent-deployment/skills/default
+    - /var/lib/hermes/.dodo-deployment/dodo-skills/default
 security:
   redact_secrets: true
 # Host-wide Slack policy: Hermes reads these only from the default profile, for every gateway
@@ -55,7 +55,7 @@ slack:
   group_user_allowed_commands: [new]
   unauthorized_dm_behavior: ignore
 max_concurrent_sessions: 4
-timezone: UTC
+timezone: Etc/UTC
 # The dispatcher claims tasks only for the declared Kanban workers, one at a time each, and never
 # decomposes or auto-reviews cards with a side model.
 kanban:

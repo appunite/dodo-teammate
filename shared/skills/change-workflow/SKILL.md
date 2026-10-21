@@ -40,7 +40,7 @@ mise trust && mise install && mise run setup
    questions from Hermes source at the deployed release and cite file and line.
 3. Keep the change small and coherent. Anything project-specific (MCP servers and tools,
    credentials, restricted paths) goes in the `policy` block of `profiles/fleet.yaml`;
-   `src/fleet-rules.ts` and `scripts/reconcile.sh` stay generic. Bump a profile's
+   `infra/src/validate-fleet.ts` and `infra/assets/reconcile-profiles.sh` stay generic. Bump a profile's
    `distribution.yaml` version when its files change.
 4. Run `mise run check`. Fix every failure you caused; report any you did not.
 5. Commit, push the branch, and open a pull request whose body says what changes, why, which

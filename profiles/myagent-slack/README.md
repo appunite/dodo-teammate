@@ -14,8 +14,8 @@ Record each key's owner, exact scopes, and rotation source in the pull request t
 
 ## Adding a hand-off
 
-1. Add a worker profile (`role: worker`) with the guard plugin.
+1. Add a Kanban worker profile (`kanban_worker` in the fleet) that ships the policy's worker guard.
 2. Add a typed tool to the plugin that calls `create_handoff`, and its entry in `workers.json`.
 3. List the tool in this profile's `plugins.myagent-handoff.tools` in `profiles/fleet.yaml`.
 4. Add the worker to the default profile's `kanban.dispatch_profiles`.
-5. Write the capability spec in `docs/capabilities/`.
+5. Write the capability spec in `docs/myagent-capabilities/capabilities/`.

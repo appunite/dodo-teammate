@@ -67,7 +67,7 @@ mcp_servers:
     url: https://mcp.sentry.dev/mcp/example-org?skills=inspect
     strict_redirect_headers: true
     headers:
-      Authorization: Bearer ${SENTRY_READ_TOKEN}
+      Authorization: Sentry-Bearer ${SENTRY_READ_TOKEN}
     tools:
       include: [find_projects, search_issues, search_errors, get_sentry_resource]
       resources: false
@@ -84,7 +84,7 @@ plugins:
   enabled: [myagent-handoff]
 skills:
   external_dirs:
-    - /var/lib/hermes/.myagent-deployment/skills/myagent-slack
+    - /var/lib/hermes/.dodo-deployment/dodo-skills/myagent-slack
 security:
   redact_secrets: true
 slack:

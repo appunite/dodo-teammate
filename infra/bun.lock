@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "dodo-teammate",
+      "name": "dodo-teammate-infra",
       "dependencies": {
         "yaml": "2.8.1",
       },

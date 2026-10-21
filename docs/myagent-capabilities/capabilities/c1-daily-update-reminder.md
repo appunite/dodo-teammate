@@ -13,8 +13,8 @@ thread, with a link to it. Nobody has to remember to chase updates.
 
 ## Trigger and profile
 
-- **Trigger:** `0 12 * * 1-5`, UTC (`profiles/myagent-scheduled/cron/jobs.json`).
-- **Profile:** `myagent-scheduled`, role `scheduled`, `gateway: slack_outbound`: it posts as the
+- **Trigger:** `0 12 * * 1-5`, `Etc/UTC` (the policy's timezone) (`profiles/myagent-scheduled/cron/jobs.json`).
+- **Profile:** `myagent-scheduled`, `gateway: slack_outbound`: it posts as the
   team app and nobody can message it.
 - **Who can start it:** nobody; only the schedule. An operator can run it by hand on the host.
 

@@ -1,13 +1,12 @@
-// Checks the artifact the host runs, not just the source: the bundle must be reproducible (or every
-// install would ship a new one) and must validate this checkout the way `mise run fleet` does, when
-// run the way the reconciler runs it. With --out=<path> it also writes the bundle and its SHA-256
-// for your infrastructure to install next to the reconciler.
+// Checks the artifact the host runs, not just the source: the bundle Pulumi ships must be
+// reproducible (or every `pulumi up` would upload a new one) and must validate this checkout the way
+// `mise run fleet` does, when run the way the reconciler runs it.
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import { bundleFleetValidator } from "./fleet-validator";
 
@@ -26,21 +25,14 @@ try {
   writeFileSync(bundle, first);
   const run = spawnSync(
     process.execPath,
-    ["--no-install", "--no-env-file", bundle, `--root=${resolve(import.meta.dir, "..")}`],
+    ["--no-install", "--no-env-file", bundle, `--root=${resolve(import.meta.dir, "../..")}`],
     { cwd: work, encoding: "utf8", stdio: "inherit" },
   );
   if (run.status !== 0) {
     console.error("The bundled fleet validator refused this checkout.");
     process.exit(1);
   }
+  console.log(`Fleet validator bundle ${sha256(first)} is reproducible and accepts this checkout.`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
-
-const out = /^--out=(.+)$/.exec(process.argv[2] ?? "")?.[1];
-if (out !== undefined) {
-  mkdirSync(dirname(resolve(out)), { recursive: true });
-  writeFileSync(out, first);
-  writeFileSync(`${out}.sha256`, `${sha256(first)}  validate-fleet.js\n`);
-}
-console.log(`Fleet validator bundle ${sha256(first)} is reproducible and accepts this checkout.`);

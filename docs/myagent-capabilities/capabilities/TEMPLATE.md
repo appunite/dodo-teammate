@@ -3,7 +3,7 @@
 Status: proposed | implemented on `<branch>` | live since `<date>`. Say what still has to happen
 before it is live (keys to set, jobs to resume, host changes).
 
-Part of MyAgent's capabilities. Keep this spec short: one screen is plenty for most capabilities.
+Part of [MyAgent's capabilities](../README.md). Keep this spec short: one screen is plenty for most capabilities.
 
 ## Purpose
 
@@ -12,8 +12,8 @@ What MyAgent does, for whom, and why it is worth having. One paragraph.
 ## Trigger and profile
 
 - **Trigger:** a mention or DM, a schedule (`<cron>`, timezone), or a typed hand-off.
-- **Profile:** which profile runs it and why that profile (its role decides its reach). A new
-  profile needs a line on why no existing one fits.
+- **Profile:** which profile runs it and why that profile (its gateway and the policy decide its
+  reach). A new profile needs a line on why no existing one fits.
 - **Who can start it:** the allowlist, nobody (a schedule), or only the team profile's hand-off.
 
 ## How it works
@@ -39,7 +39,10 @@ The MCP servers and the exact tools each loads.
   that may load them, and any `restricted` tools the team profile must never load;
 - `credentials`: each credential, the `profiles` that may hold it, and either `header` with its
   `urls` or `script: true` (with `copy_of` for a copy of a gateway key);
-- `restricted_paths`: any path only some files may name (where a write key lives on the host).
+- `stdio_servers`: each stdio server it runs, with its tools, credentials, and `restricted` tools;
+- `restricted_paths`: any path only some files may name (where a write key lives on the host);
+- a profile with special standing: `owner_console`, `personal_data_profiles`,
+  `model_free_profiles`, or a skill in `repository_write_skills`.
 
 ## Rules
 
@@ -57,7 +60,7 @@ validated config (preferred) versus only in the skill.
 ## Accepted risks
 
 Each risk this capability accepts, its controls, and who accepted it. Copy each one into
-`docs/accepted-risks.md`.
+[the accepted-risk list](../accepted-risks.md).
 
 ## Rollout
 
