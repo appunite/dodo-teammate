@@ -22,7 +22,8 @@ contract** first.
 - **Read-only answers in Slack** → the `team` profile: add an MCP server with an exact
   `tools.include` and a read-only key. No `web`, `vision`, or shell next to it.
 - **A write from Slack** → the `team` profile only if it is small and reversible; list each write
-  tool in `reviewed_writes`, add an accepted risk, and make the skill report every write.
+  tool in its server's `writes` and the profile in its `writers` in the fleet policy, add an
+  accepted risk, and make the skill report every write.
 - **Code execution, extra credentials, or a heavy skill** → a new `worker` profile behind a typed
   hand-off tool (`profiles/myagent-slack/README.md` → **Adding a hand-off**). Copy
   `profiles/myagent-writer/`.
@@ -36,12 +37,22 @@ contract** first.
   phases. State the risk once in the spec and `docs/accepted-risks.md`.
 - If a design needs something heavier, say why in one line and ask before building it.
 
-## Every boundary rule lives in two places
+## Policy in the fleet, rules in the validator
 
-A new kind of rule goes into `src/fleet-rules.ts`; if it guards a boundary, also into
-`scripts/host_rules.py` with the same meaning and a case in `test/parity.test.ts`. Changing
-`host_rules.py` or `scripts/reconcile.sh` is a host change: it takes effect only when your
-infrastructure workflow installs them on the host.
+`src/fleet-rules.ts` is the one validator: CI runs it, and the host runs the same code from a bundle
+your infrastructure installs by hash. It and `scripts/reconcile.sh` must stay generic: never put a
+project's profile names, MCP URLs, tools, credential names, or paths in either. Those belong in the
+`policy` block of `profiles/fleet.yaml`:
+
+- a remote MCP server or tool: `policy.mcp_servers` (exact URL, `tools`, `writes` and `writers`,
+  `restricted` tools the team profile never loads);
+- a credential: `policy.credentials` (the `profiles` that may hold it, and `header` with `urls`, or
+  `script: true`, with `copy_of` for a copy of a gateway key);
+- a path only some files may name: `policy.restricted_paths`.
+
+Most capabilities change only the policy and profile files. Change the validator only for a new kind
+of rule, keep it generic, add a case to `test/fleet-cli.test.ts`, and remember it is a host change:
+it takes effect when your infrastructure installs the new bundle (`mise run build-validator`).
 
 ## Check Hermes against the host, not the docs
 

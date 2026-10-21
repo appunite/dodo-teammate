@@ -1,6 +1,9 @@
 // The fleet contract: every safety property the template relies on, checked against the files in
-// this repository. scripts/host_rules.py re-checks the core of it on the host before a deployment;
-// a rule added here that guards a boundary gets the same rule there.
+// this repository. There is one implementation: CI runs it (`mise run fleet`), and the host runs the
+// same code, bundled (src/fleet-validator.ts), before the reconciler changes anything. The rules are
+// generic: everything project-specific they check (reviewed MCP URLs and tools, where each
+// credential may go, restricted paths, the timezone) is the `policy` in profiles/fleet.yaml. Never
+// put a project's names, URLs, tools, or credentials in this file.
 //
 // Toolset names, config keys, and the Slack, Kanban, and MCP behaviour assumed here are those of
 // Hermes Agent v0.21.5 (tag v2026.9.24), as the reference implementation (Dodo) verified them.
@@ -10,7 +13,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { parse } from "yaml";
 
-export const schemaVersion = 1;
+export const schemaVersion = 2;
 export const platforms = ["cli", "api_server", "slack", "cron"] as const;
 export type Platform = (typeof platforms)[number];
 
@@ -157,7 +160,16 @@ const reservedEnvPrefixes = [
 ];
 const mcpNamePattern = /^[a-z][a-z0-9_-]*$/;
 const mcpToolNamePattern = /^[A-Za-z0-9_.:/-]+$/;
-const headerValuePattern = /^(?:Bearer |Sentry-Bearer )?\$\{([A-Z][A-Z0-9_]*)\}$/;
+const headerValuePattern = /^(?:([A-Za-z][A-Za-z-]*) )?\$\{([A-Z][A-Z0-9_]*)\}$/;
+const authorizationSchemePattern = /^[A-Za-z][A-Za-z-]*$/;
+// https with a host: no user info, fragment, whitespace, or `$`. A query is fine: every server URL
+// is an exact URL the policy reviews.
+const httpsUrlPattern = /^https:\/\/[A-Za-z0-9.-]+(?::\d+)?(?:\/[^\s$#@\\]*)?$/;
+// Keys a gateway holds in a profile's .env; Hermes forwards none of them to a child process.
+const gatewayKeys: Record<string, readonly string[]> = {
+  slack: ["SLACK_APP_TOKEN", "SLACK_BOT_TOKEN"],
+  slack_outbound: ["SLACK_BOT_TOKEN"],
+};
 const deleteToolPattern = /(?:^|[_-])(?:delete|destroy|purge|drop)(?:[_-]|$)/i;
 const writeToolPattern =
   /^(?:save|create|update|delete|post|send|write|put|set|add|remove|upload|merge|publish|run|execute|edit|patch|assign|close|archive)(?:[_-]|$)/i;
@@ -199,15 +211,17 @@ function isObject(value: unknown): value is Json {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// Hermes reads YAML with PyYAML, which implements YAML 1.1 (on, off, yes, and no are booleans), so
+// the validator reads every YAML file the same way.
 function readYaml(path: string): Json {
-  const value = parse(readFileSync(path, "utf8"));
+  const value = parse(readFileSync(path, "utf8"), { version: "1.1" });
   return isObject(value) ? value : {};
 }
 
 function walk(root: string, directory = root): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(directory)) {
-    if (entry === ".git" || entry === "node_modules") continue;
+    if (entry === ".git" || entry === "node_modules" || entry === "dist") continue;
     const path = join(directory, entry);
     if (statSync(path).isDirectory()) found.push(...walk(root, path));
     else found.push(relative(root, path));
@@ -287,6 +301,123 @@ function strings(value: unknown): string[] | undefined {
     : undefined;
 }
 
+interface ServerPolicy {
+  url?: string;
+  command?: string;
+  tools: string[];
+  writes: string[];
+  writers: string[];
+  restricted: string[];
+}
+
+interface CredentialPolicy {
+  profiles: string[];
+  header?: string;
+  urls: string[];
+  script: boolean;
+  copyOf?: string;
+}
+
+interface Policy {
+  timezone?: string;
+  servers: ServerPolicy[];
+  credentials: Record<string, CredentialPolicy>;
+  restrictedPaths: Record<string, string[]>;
+}
+
+// The fleet's reviewed policy (profiles/fleet.yaml `policy`), checked for shape. Problems go to fail.
+export function parsePolicy(value: unknown, fail: (message: string) => void): Policy {
+  const policy: Policy = { servers: [], credentials: {}, restrictedPaths: {} };
+  if (!isObject(value)) {
+    fail("policy: profiles/fleet.yaml needs a policy mapping.");
+    return policy;
+  }
+  for (const key of Object.keys(value)) {
+    if (!["credentials", "mcp_servers", "restricted_paths", "timezone"].includes(key)) {
+      fail(`policy: unknown key ${key}.`);
+    }
+  }
+  if (value.timezone !== undefined) {
+    if (typeof value.timezone !== "string") fail("policy: timezone must be a zone name.");
+    else policy.timezone = value.timezone;
+  }
+  for (const entry of Array.isArray(value.mcp_servers) ? value.mcp_servers : []) {
+    if (!isObject(entry)) {
+      fail("policy: every mcp_servers entry is a mapping.");
+      continue;
+    }
+    const where = `policy mcp_servers ${String(entry.url ?? entry.command)}`;
+    const url = typeof entry.url === "string" ? entry.url : undefined;
+    const command = typeof entry.command === "string" ? entry.command : undefined;
+    if ((url === undefined) === (command === undefined))
+      fail(`${where}: needs a url or a command.`);
+    if (url !== undefined && !httpsUrlPattern.test(url)) fail(`${where}: url must be https.`);
+    const server: ServerPolicy = {
+      ...(url === undefined ? {} : { url }),
+      ...(command === undefined ? {} : { command }),
+      tools: strings(entry.tools) ?? [],
+      writes: strings(entry.writes ?? []) ?? [],
+      writers: strings(entry.writers ?? []) ?? [],
+      restricted: strings(entry.restricted ?? []) ?? [],
+    };
+    if (server.tools.length === 0) fail(`${where}: tools must list the reviewed tools.`);
+    for (const tool of server.tools) {
+      if (deleteToolPattern.test(tool)) fail(`${where}: ${tool} is a delete tool.`);
+    }
+    for (const tool of [...server.writes, ...server.restricted]) {
+      if (!server.tools.includes(tool)) fail(`${where}: ${tool} is not one of its tools.`);
+    }
+    if (server.writes.length > 0 !== server.writers.length > 0) {
+      fail(`${where}: lists writes and their writers together.`);
+    }
+    policy.servers.push(server);
+  }
+  const reviewedUrls = policy.servers.flatMap((server) => (server.url ? [server.url] : []));
+  for (const [name, entry] of Object.entries(
+    isObject(value.credentials) ? value.credentials : {},
+  )) {
+    const where = `policy credentials ${name}`;
+    if (!isObject(entry)) {
+      fail(`${where}: must be a mapping.`);
+      continue;
+    }
+    const header = typeof entry.header === "string" ? entry.header : undefined;
+    const credential: CredentialPolicy = {
+      profiles: strings(entry.profiles) ?? [],
+      ...(header === undefined ? {} : { header }),
+      urls: strings(entry.urls ?? []) ?? [],
+      script: entry.script === true,
+      ...(typeof entry.copy_of === "string" ? { copyOf: entry.copy_of } : {}),
+    };
+    if (credential.profiles.length === 0) fail(`${where}: profiles lists who may hold it.`);
+    if (header !== undefined) {
+      if (!authorizationSchemePattern.test(header) || credential.urls.length === 0) {
+        fail(`${where}: a header credential names its scheme and its urls.`);
+      }
+      if (credential.script) fail(`${where}: is a header or a script credential, not both.`);
+    } else if (!credential.script) {
+      fail(
+        `${where}: is a header credential (header, urls) or a script credential (script: true).`,
+      );
+    }
+    for (const url of credential.urls) {
+      if (!reviewedUrls.includes(url)) fail(`${where}: ${url} is not in policy.mcp_servers.`);
+    }
+    if (credential.copyOf !== undefined) {
+      if (!credential.script || !Object.values(gatewayKeys).flat().includes(credential.copyOf)) {
+        fail(`${where}: copy_of names a gateway key, on a script credential.`);
+      }
+    }
+    policy.credentials[name] = credential;
+  }
+  for (const [path, users] of Object.entries(
+    isObject(value.restricted_paths) ? value.restricted_paths : {},
+  )) {
+    policy.restrictedPaths[path] = strings(users) ?? [];
+  }
+  return policy;
+}
+
 // Returns every problem found. An empty list means the fleet satisfies the contract.
 export function validate(repo: Repo): string[] {
   const problems: string[] = [];
@@ -315,23 +446,17 @@ export function validate(repo: Repo): string[] {
   if (byRole("team").length > 1) fail("fleet: at most one profile has role team.");
   const workers = byRole("worker").map((profile) => String(profile.name));
 
-  const writes = Array.isArray(fleet.reviewed_writes) ? fleet.reviewed_writes.filter(isObject) : [];
-  const reviewedWrite = (profile: string, server: string, tool: string) =>
-    writes.some(
-      (entry) =>
-        entry.profile === profile &&
-        entry.server === server &&
-        (strings(entry.tools) ?? []).includes(tool),
+  const policy = parsePolicy(fleet.policy, fail);
+  if ("reviewed_writes" in fleet) fail("fleet: reviewed writes live in policy.mcp_servers.");
+  const declared = new Set(profiles.map((profile) => String(profile.name)));
+  const unknown = [
+    ...policy.servers.flatMap((server) => server.writers),
+    ...Object.values(policy.credentials).flatMap((credential) => credential.profiles),
+  ].filter((profile) => !declared.has(profile));
+  if (unknown.length > 0)
+    fail(
+      `policy: names profiles the fleet does not declare: ${sorted(new Set(unknown)).join(", ")}.`,
     );
-  for (const entry of writes) {
-    const target = profiles.find((profile) => profile.name === entry.profile);
-    if (!target || !isObject(target.mcp_servers) || !(String(entry.server) in target.mcp_servers)) {
-      fail(`reviewed_writes: ${entry.profile}/${entry.server} is not a declared MCP server.`);
-    }
-    for (const tool of strings(entry.tools) ?? []) {
-      if (deleteToolPattern.test(tool)) fail(`reviewed_writes: ${tool} is a delete tool.`);
-    }
-  }
 
   for (const profile of profiles) {
     const name = String(profile.name);
@@ -459,9 +584,12 @@ export function validate(repo: Repo): string[] {
       if (!namedServers.has(server)) fail(`${at}: MCP server ${server} is named on no surface.`);
     }
 
-    // MCP servers.
+    // MCP servers: each one the policy reviews, loading only reviewed tools.
     const runtimeEnv = strings(profile.runtime_env) ?? [];
-    const referencedEnv = new Set<string>();
+    const config = repo.configs[name] ?? {};
+    const terminal = isObject(config.terminal) ? config.terminal : {};
+    const passthrough = strings(terminal.env_passthrough) ?? [];
+    const sent = new Set<string>();
     for (const [server, definition] of Object.entries(servers)) {
       const where = `${at} mcp ${server}`;
       if (!mcpNamePattern.test(server) || knownToolsets.has(server) || server === noMcp) {
@@ -475,7 +603,7 @@ export function validate(repo: Repo): string[] {
         if (!mcpServerKeys.has(key)) fail(`${where}: unsupported key ${key}.`);
       }
       if (typeof definition.url === "string") {
-        if (!definition.url.startsWith("https://")) fail(`${where}: url must be https.`);
+        if (!httpsUrlPattern.test(definition.url)) fail(`${where}: url must be https with a host.`);
         if (definition.strict_redirect_headers !== true) {
           fail(
             `${where}: strict_redirect_headers must be true, so a redirect never carries the key.`,
@@ -485,6 +613,13 @@ export function validate(repo: Repo): string[] {
       } else if (typeof definition.command !== "string" || !definition.command.startsWith("/")) {
         fail(`${where}: needs an https url or an absolute command path.`);
       }
+      const reviewed = policy.servers.find((entry) =>
+        typeof definition.url === "string"
+          ? entry.url === definition.url
+          : entry.command !== undefined && entry.command === definition.command,
+      );
+      if (!reviewed)
+        fail(`${where}: its url or command is not a reviewed server in policy.mcp_servers.`);
       const tools = isObject(definition.tools) ? definition.tools : {};
       const include = strings(tools.include) ?? [];
       if (include.length === 0) fail(`${where}: tools.include must list the exact tools it loads.`);
@@ -500,10 +635,22 @@ export function validate(repo: Repo): string[] {
       for (const tool of include) {
         if (!mcpToolNamePattern.test(tool) || tool.includes("*"))
           fail(`${where}: invalid tool ${tool}.`);
-        if (deleteToolPattern.test(tool))
+        if (deleteToolPattern.test(tool)) {
           fail(`${where}: ${tool} is a delete tool; no profile loads one.`);
-        else if (writeToolPattern.test(tool) && !reviewedWrite(name, server, tool)) {
-          fail(`${where}: ${tool} writes; list it in reviewed_writes for ${name}/${server}.`);
+          continue;
+        }
+        if (!reviewed) continue;
+        if (!reviewed.tools.includes(tool)) fail(`${where}: the policy does not review ${tool}.`);
+        else if (writeToolPattern.test(tool) && !reviewed.writes.includes(tool)) {
+          fail(`${where}: ${tool} writes; list it in its server's writes in the policy.`);
+        }
+        if (reviewed.writes.includes(tool) && !reviewed.writers.includes(name)) {
+          fail(
+            `${where}: ${tool} writes, and only ${reviewed.writers.join(", ") || "no profile"} may.`,
+          );
+        }
+        if (reviewed.restricted.includes(tool) && role === "team") {
+          fail(`${where}: ${tool} is restricted; a profile teammates can message never loads it.`);
         }
       }
       const headers = isObject(definition.headers) ? definition.headers : {};
@@ -514,24 +661,37 @@ export function validate(repo: Repo): string[] {
           fail(`${where}: ${header} must be a \${NAME} reference, never a literal value.`);
           continue;
         }
-        referencedEnv.add(match[1] as string);
-        if (!runtimeEnv.includes(match[1] as string)) {
-          fail(`${where}: ${header} uses ${match[1]}, which runtime_env does not declare.`);
+        const variable = match[2] as string;
+        if (!runtimeEnv.includes(variable)) {
+          fail(`${where}: ${header} uses ${variable}, which runtime_env does not declare.`);
         }
+        const credential = policy.credentials[variable];
+        if (
+          !credential?.header ||
+          header !== "Authorization" ||
+          Object.keys(headers).length !== 1 ||
+          match[1] !== credential.header ||
+          typeof definition.url !== "string" ||
+          !credential.urls.includes(definition.url)
+        ) {
+          fail(
+            `${where}: ${variable} may travel only as the server's one header, ` +
+              `Authorization: <its policy scheme> \${${variable}}, to its policy urls.`,
+          );
+        }
+        sent.add(variable);
       }
     }
 
-    // Credentials.
+    // Credentials: every one the policy lists, held only where it says, used only as it says.
     if (new Set(runtimeEnv).size !== runtimeEnv.length) fail(`${at}: runtime_env repeats a name.`);
     if (isDefault && runtimeEnv.length > 0)
       fail(`${at}: the default profile holds no capability credentials.`);
-    const config = repo.configs[name] ?? {};
-    const terminal = isObject(config.terminal) ? config.terminal : {};
-    const passthrough = strings(terminal.env_passthrough) ?? [];
     for (const variable of passthrough) {
-      referencedEnv.add(variable);
       if (!runtimeEnv.includes(variable))
         fail(`${at}: env_passthrough ${variable} is not in runtime_env.`);
+      else if (!policy.credentials[variable]?.script)
+        fail(`${at}: env_passthrough ${variable} is not a script credential in the policy.`);
     }
     for (const variable of runtimeEnv) {
       if (!runtimeEnvNamePattern.test(variable))
@@ -539,7 +699,28 @@ export function validate(repo: Repo): string[] {
       if (reservedEnvPrefixes.some((prefix) => variable.startsWith(prefix))) {
         fail(`${at}: ${variable} uses a prefix Hermes reserves; Slack tokens come from gateway.`);
       }
-      if (!referencedEnv.has(variable)) fail(`${at}: runtime_env ${variable} is used by nothing.`);
+      const credential = policy.credentials[variable];
+      if (!credential) {
+        fail(`${at}: runtime_env ${variable} is not in policy.credentials.`);
+        continue;
+      }
+      if (!credential.profiles.includes(name)) {
+        fail(`${at}: ${variable} belongs only to ${credential.profiles.join(", ")}.`);
+      }
+      if (credential.header && !sent.has(variable)) {
+        fail(`${at}: declares ${variable}, but no MCP server sends it.`);
+      }
+      if (credential.script && !passthrough.includes(variable)) {
+        fail(`${at}: script credential ${variable} must be passed in terminal.env_passthrough.`);
+      }
+      if (
+        credential.copyOf !== undefined &&
+        !(gatewayKeys[String(profile.gateway)] ?? []).includes(credential.copyOf)
+      ) {
+        fail(
+          `${at}: ${variable} copies ${credential.copyOf}, which this profile's gateway does not hold.`,
+        );
+      }
     }
 
     // config.yaml mirrors the fleet entry.
@@ -570,6 +751,9 @@ export function validate(repo: Repo): string[] {
       fail(`${at}: security.redact_secrets must be true.`);
     }
     if (terminal.backend !== "local") fail(`${at}: terminal.backend must be stated as local.`);
+    if ("timezone" in config && config.timezone !== policy.timezone) {
+      fail(`${at}: timezone must be the policy's ${String(policy.timezone)}.`);
+    }
     for (const variable of passthrough) {
       if (variable.startsWith("SLACK_"))
         fail(`${at}: Hermes never passes ${variable} to a script.`);
@@ -834,6 +1018,11 @@ export function validate(repo: Repo): string[] {
       fail(`${file}: runtime state or secrets never belong in Git.`);
     if (/\.(?:png|jpg|jpeg|gif|pdf|woff2?|ttf|lockb)$/.test(base)) continue;
     const text = readFileSync(join(repo.root, file), "utf8");
+    for (const [restricted, users] of Object.entries(policy.restrictedPaths)) {
+      if (text.includes(restricted) && base !== "README.md" && !users.includes(file)) {
+        fail(`${file}: names ${restricted}; only ${users.join(", ") || "no file"} may.`);
+      }
+    }
     if (secretPatterns.some((pattern) => pattern.test(text)))
       fail(`${file}: looks like it contains a secret.`);
   }

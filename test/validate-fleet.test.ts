@@ -101,13 +101,13 @@ describe("writes are bounded by reviewed lists", () => {
     );
   });
 
-  test("refuses a write tool missing from reviewed_writes", () => {
+  test("refuses a tool the policy does not review", () => {
     expectRefused(
       (repo) =>
         both(repo, "myagent-slack", (entry) =>
           entry.mcp_servers.linear.tools.include.push("create_project"),
         ),
-      "list it in reviewed_writes",
+      "the policy does not review create_project",
     );
   });
 

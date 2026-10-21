@@ -26,7 +26,7 @@ manager), the command that triggers a reconciliation, and where its log lands.
 From the changed files:
 
 - **Fleet** (`profiles/`, `shared/`): merging triggers a reconciliation. Read its result.
-- **Host** (`scripts/reconcile.sh`, `scripts/host_rules.py`, your infrastructure code): the user
+- **Host** (`scripts/reconcile.sh`, `src/` (the validator bundle), your infrastructure code): the user
   applies the infrastructure change first, so the host runs the new reconciler; then trigger a
   reconciliation. Until then the old reconciler checks the new release and may refuse it, which is
   the safe direction.

@@ -1,4 +1,4 @@
-schema_version: 1
+schema_version: 2
 # The agent's name. Every profile is named `<agent_name>-<job>`, the hand-off plugin
 # `<agent_name>-handoff` (toolset `<agent_name>_handoff`), and the worker guard
 # `<agent_name>-worker-guard`. scripts/rename-agent.sh replaces the placeholder `myagent` everywhere.
@@ -8,15 +8,50 @@ agent_name: myagent
 # allowed user.
 owner_slack_id: U000OWNER
 
-# Writes are bounded by this reviewed list, not by skills or prompts. A tool whose name reads as a
-# write (save_, create_, update_, post_, send_, ...) may appear in a profile's tools.include only
-# when it is listed here for that profile and server. delete_* tools are refused everywhere.
-reviewed_writes:
-  - profile: myagent-slack
-    server: linear
-    tools: [save_issue, save_comment]
+# The reviewed policy: everything project-specific the generic rules in src/fleet-rules.ts check. It
+# deploys with the profiles, so changing it is a reviewed change like any other in this file. The
+# validator and the reconciler never name a project's URLs, tools, or credentials themselves.
+policy:
+  # The timezone every profile that sets one uses.
+  timezone: UTC
+  # Every remote MCP server a profile may declare, by its exact URL, with every tool any profile may
+  # load from it. Only the profiles in writers may load the tools in writes; a tool whose name reads
+  # as a write (save_, create_, update_, post_, send_, ...) must be listed in writes. A profile
+  # teammates can message (role team) never loads restricted tools. delete_* tools are refused
+  # everywhere.
+  mcp_servers:
     # Accepted risk (docs/accepted-risks.md): the team profile writes issues without an approval
-    # click. Controls: the user allowlist, this list, no delete tools, every write reported.
+    # click. Controls: the user allowlist, these writes, no delete tools, every write reported.
+    - url: https://mcp.linear.app/mcp
+      tools: [get_issue, list_comments, list_issue_labels, list_issues, list_teams, save_comment,
+        save_issue]
+      writes: [save_comment, save_issue]
+      writers: [myagent-slack]
+    # Replace example-org with your Sentry organisation slug. ?skills=inspect loads read tools only.
+    - url: https://mcp.sentry.dev/mcp/example-org?skills=inspect
+      tools: [find_projects, get_sentry_resource, search_errors, search_issues]
+  # Every credential a profile may declare in runtime_env, and the only profiles that may. A header
+  # credential travels only as its server's one header, `Authorization: <header> ${NAME}`, to the
+  # listed URLs. A script credential reaches only scripts, through terminal.env_passthrough; copy_of
+  # names the Slack key it duplicates for scripts, which Hermes never forwards to a child.
+  credentials:
+    LINEAR_TEAM_TOKEN:
+      profiles: [myagent-slack]
+      header: Bearer
+      urls:
+        - https://mcp.linear.app/mcp
+    SENTRY_READ_TOKEN:
+      profiles: [myagent-slack]
+      header: Bearer
+      urls:
+        - https://mcp.sentry.dev/mcp/example-org?skills=inspect
+    MYAGENT_SLACK_BOT_TOKEN:
+      profiles: [myagent-scheduled]
+      script: true
+      copy_of: SLACK_BOT_TOKEN
+  # Paths only the listed files may name (a README may describe them), such as where a write key
+  # lives on the host.
+  restricted_paths: {}
 
 # The Hermes launch profile. It holds the host-wide Slack policy and the Kanban dispatcher, and no
 # capability credentials.
@@ -138,7 +173,7 @@ profiles:
     mcp_servers: {}
     plugins: {}
     # Hermes passes no SLACK_* key to a script, so the script reads the team app's bot token under
-    # this name too (Dodo: infra/src/fleet-contract.ts, slackScriptTokenName).
+    # this name too (policy.credentials, copy_of).
     runtime_env: [MYAGENT_SLACK_BOT_TOKEN]
     skills: [authority-boundaries, untrusted-input]
 

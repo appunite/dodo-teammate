@@ -5,16 +5,18 @@
 # triggered by your deployment path with the exact commit SHA that was merged. It:
 #
 #   1. verifies the revision is reachable from an allowed branch;
-#   2. extracts the release and re-validates it with host_rules.py (installed next to this script,
-#      never taken from the release it checks);
+#   2. extracts the release and re-validates it with the fleet validator bundle (validate-fleet.js,
+#      the same code CI runs, installed next to this script, never taken from the release it checks);
 #   3. snapshots what it will change, and arms a rollback;
 #   4. projects each profile's selected skills as a read-only view;
 #   5. installs or updates every declared profile through the Hermes CLI and reapplies the config
 #      fields this repository owns, keeping runtime state (model, keys, sessions, memory);
 #   6. records the deployed revision, or restores the snapshot on any failure.
 #
-# Install this script and host_rules.py on the host through your infrastructure tooling, not from
-# the release, so a profile change can never rewrite the code that checks it.
+# Install this script and the validator bundle (`mise run build-validator` writes
+# dist/validate-fleet.js and its SHA-256) on the host through your infrastructure tooling, by hash,
+# never from the release, so a profile change can never rewrite the code that checks it. Both stay
+# generic: everything project-specific is the policy in profiles/fleet.yaml.
 #
 # TODO markers are host-specific decisions the template cannot make for you.
 
@@ -42,8 +44,25 @@ readonly HERMES_BIN="${HERMES_HOME}/.local/bin/hermes"
 # hermes owns the Hermes venv, so Python that runs as root uses the system interpreter in isolated
 # mode, never the venv.
 readonly SYSTEM_PYTHON="/usr/bin/python3"
-HOST_RULES="$(dirname "$(readlink -f "$0")")/host_rules.py"
-readonly HOST_RULES
+VALIDATOR="$(dirname "$(readlink -f "$0")")/validate-fleet.js"
+readonly VALIDATOR
+# TODO: where your infrastructure installs a root-owned bun, pinned by version and SHA-256. Root runs
+# it only for the validator bundle.
+readonly BUN="/opt/myagent/bin/bun"
+
+# Runs the validator bundle over a release as root, from an empty directory with a minimal
+# environment, so no .env, bunfig.toml, or auto-install can change what runs.
+validate_release() {
+  local work status=0
+  work="$(mktemp -d)"
+  (
+    cd "${work}" &&
+      env -i PATH=/usr/bin:/bin HOME="${work}" \
+        "${BUN}" --no-install --no-env-file "${VALIDATOR}" --root="$1"
+  ) || status=$?
+  rm -rf -- "${work}"
+  return "${status}"
+}
 
 old_release=""
 previous_skills=""
@@ -135,6 +154,8 @@ rollback() {
 }
 
 [[ "${REQUESTED_REVISION}" =~ ^[0-9a-f]{40}$ ]] || fail "Revision must be a full lowercase Git SHA."
+test -f "${VALIDATOR}" || fail "The validator bundle is missing next to the reconciler."
+test -x "${BUN}" && test "$(stat -L -c %U "${BUN}")" = root || fail "The root-owned bun is missing at ${BUN}."
 install -d -o root -g hermes -m 0755 "${DEPLOY_ROOT}" "${RELEASES_ROOT}"
 
 # 1. The revision must be on an allowed branch.
@@ -155,12 +176,12 @@ release="${RELEASES_ROOT}/${REQUESTED_REVISION}"
 if test ! -d "${release}"; then
   staging="$(mktemp -d "${RELEASES_ROOT}/.${REQUESTED_REVISION}.XXXXXX")"
   git -C "${MIRROR}" archive "${REQUESTED_REVISION}" | tar -x -C "${staging}"
-  "${SYSTEM_PYTHON}" -I "${HOST_RULES}" "${staging}" || fail "The release breaks a boundary rule; nothing was changed."
+  validate_release "${staging}" || fail "The release breaks a boundary rule; nothing was changed."
   chown -R root:hermes "${staging}"
   chmod -R u=rwX,go=rX "${staging}"
   mv "${staging}" "${release}"
 else
-  "${SYSTEM_PYTHON}" -I "${HOST_RULES}" "${release}" || fail "The release breaks a boundary rule; nothing was changed."
+  validate_release "${release}" || fail "The release breaks a boundary rule; nothing was changed."
 fi
 mapfile -t declared_profiles < <(
   "${SYSTEM_PYTHON}" -I -c '

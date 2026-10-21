@@ -29,7 +29,7 @@ the teammate.
    credentials, memory, and reach. A capability that needs more than its profile allows gets a new
    profile, not a longer prompt.
 3. **Separate ingress from authority.** What teammates can talk to holds read-only keys, plus
-   writes listed one by one in `reviewed_writes`. What writes on its own runs from a schedule or a
+   writes the fleet policy lists one by one. What writes on its own runs from a schedule or a
    typed hand-off, where nobody can talk to it.
 4. **Never private data, untrusted text, and a way out on one surface.** A surface that reads
    private data through an MCP server never also selects `web`, `vision`, `browser`, or (where
@@ -41,10 +41,11 @@ the teammate.
    tools. A typed hand-off tool takes a few validated arguments; reviewed code picks the worker,
    the limits, the task text, and the Slack thread that hears back. A guard keeps each worker on
    its own task.
-7. **Every rule is enforced twice.** CI runs the contract in TypeScript; the host re-checks the
-   boundary rules in Python ([`scripts/host_rules.py`](scripts/host_rules.py)) before it changes
-   anything, and [`test/parity.test.ts`](test/parity.test.ts) proves both refuse the same broken
-   fleets.
+7. **One generic validator, run twice.** CI runs the fleet contract
+   ([`src/fleet-rules.ts`](src/fleet-rules.ts)); the host runs the same code, from a bundle your
+   infrastructure installs by hash, before it changes anything. The validator and the reconciler
+   never name your project's URLs, tools, or credentials: everything project-specific lives in the
+   `policy` block of [`profiles/fleet.yaml`](profiles/fleet.yaml), reviewed with the profiles.
 8. **Accepted risks are written down.** Safety is a list of decisions with an owner and a reason.
    Start [`docs/accepted-risks.md`](docs/accepted-risks.md) on day one.
 
@@ -52,15 +53,14 @@ the teammate.
 
 | Path | What it does |
 |---|---|
-| [`profiles/fleet.yaml`](profiles/fleet.yaml) | The fleet: every profile, its role, reach, toolsets per surface, MCP servers with exact tool lists, plugins, credential names, schedules, and skills. |
+| [`profiles/fleet.yaml`](profiles/fleet.yaml) | The fleet: every profile, its role, reach, toolsets per surface, MCP servers with exact tool lists, plugins, credential names, schedules, and skills, plus the `policy`: reviewed MCP servers and tools, where each credential may go, restricted paths, the timezone. |
 | [`profiles/default/`](profiles/default/README.md) | Hermes's launch profile: host-wide Slack policy and the Kanban dispatcher. |
 | [`profiles/myagent-admin/`](profiles/myagent-admin/README.md) | The owner's private console (role `owner`): DM-only, one user, memory, web, and a terminal. |
 | [`profiles/myagent-slack/`](profiles/myagent-slack/README.md) | The team's front door (role `team`): allowlisted people and channels, read tools, one reviewed write, typed hand-offs. |
 | [`profiles/myagent-scheduled/`](profiles/myagent-scheduled/README.md) | Reviewed schedules with no Slack ingress (role `scheduled`), with a no-model daily-update reminder. |
 | [`profiles/myagent-writer/`](profiles/myagent-writer/README.md) | An example Kanban worker (role `worker`) that turns a thread into a Markdown document. |
 | `shared/skills/` | Skills, selected per profile: `untrusted-input`, `evidence-and-provenance`, `authority-boundaries`, a capabilities map, and the change workflow. |
-| [`src/fleet-rules.ts`](src/fleet-rules.ts) | The fleet contract, run in CI by [`src/validate-fleet.ts`](src/validate-fleet.ts). |
-| [`scripts/host_rules.py`](scripts/host_rules.py) | The boundary rules again, for the host. |
+| [`src/fleet-rules.ts`](src/fleet-rules.ts) | The generic fleet contract, run by [`src/validate-fleet.ts`](src/validate-fleet.ts) in CI and, bundled by [`src/fleet-validator.ts`](src/fleet-validator.ts), on the host. |
 | [`scripts/reconcile.sh`](scripts/reconcile.sh) | A host reconciler skeleton: verify the revision, re-validate, snapshot, install, reapply owned config, roll back on failure. Host-specific parts are marked TODO. |
 | [`docs/capabilities/`](docs/capabilities/TEMPLATE.md) | The capability spec template and a worked example. |
 | `.claude/skills/` | Claude Code skills for building a capability and deploying it. |
@@ -70,7 +70,7 @@ the teammate.
 | Kind | Examples | Source of truth | How it changes |
 |---|---|---|---|
 | **Fleet** | Profiles, instructions, toolsets, allowlists, skills, schedules, plugins, credential names | This repository | Pull request, merge, reconcile |
-| **Host** | The machine, its identity, the reconciler and `host_rules.py`, the deployment trigger | Your infrastructure code | Your infrastructure workflow |
+| **Host** | The machine, its identity, the reconciler and the validator bundle, the deployment trigger | Your infrastructure code | Your infrastructure workflow |
 | **Runtime** | Model and provider, credential values, sessions, memory, whether a job is paused | The host only, never Git | Hermes dashboard or a host shell |
 
 Anything the reconciler owns is overwritten on the next deployment, so fixing fleet state on the
@@ -111,11 +111,13 @@ controls in validated config, not in dry-run phases.
    execution, extra credentials, or a heavy skill becomes a worker behind a typed hand-off (see
    [`profiles/myagent-slack/README.md`](profiles/myagent-slack/README.md)). Anything on a clock
    goes to the scheduled profile, as a script when no judgement is needed.
-3. Edit `profiles/fleet.yaml` and the profile's `config.yaml` identically; add a write tool to
-   `reviewed_writes` only with its accepted risk; bump the profile's `distribution.yaml` version.
+3. Edit `profiles/fleet.yaml` and the profile's `config.yaml` identically. Add the capability's
+   MCP servers, tools, writes and writers, and credentials to the fleet `policy` (a write only with
+   its accepted risk); bump the profile's `distribution.yaml` version.
 4. Add a line to the `myagent-capabilities` skill so the agent can tell people about it.
-5. If the capability needs a new kind of rule, add it to `src/fleet-rules.ts` and, if it guards a
-   boundary, to `scripts/host_rules.py` and `test/parity.test.ts`.
+5. Only if the capability needs a new kind of rule, add it to `src/fleet-rules.ts`, generic and with
+   a case in `test/fleet-cli.test.ts`; the host gets it when your infrastructure installs the new
+   bundle (`mise run build-validator`).
 6. Run `mise run check` and open a pull request that names every runtime step (keys to set, jobs
    to resume) and how to test it in Slack.
 

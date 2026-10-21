@@ -1,5 +1,5 @@
 name: myagent-admin
-version: 0.1.0
+version: 0.1.1
 description: "The owner's private console: operate the agent, try capabilities, and propose changes to this repository as pull requests."
 author: Your team
 license: Proprietary

@@ -30,8 +30,16 @@ description = "Validate the profile fleet against the contract"
 run = "bun run src/validate-fleet.ts"
 
 [tasks.test]
-description = "Test the contract and its host-side twin (needs /usr/bin/python3 with PyYAML, or HOST_PYTHON)"
+description = "Test the fleet contract, in memory and through the validator CLI"
 run = "bun test"
+
+[tasks.fleet-bundle]
+description = "Check the validator bundle the host runs: reproducible and accepting this checkout"
+run = "bun run src/check-fleet-validator.ts"
+
+[tasks.build-validator]
+description = "Write dist/validate-fleet.js and its SHA-256, for your infrastructure to install"
+run = "bun run src/check-fleet-validator.ts --out=dist/validate-fleet.js"
 
 [tasks.plugins]
 description = "Unit-test the Hermes plugins"
@@ -60,6 +68,7 @@ depends = [
   "lint",
   "typecheck",
   "fleet",
+  "fleet-bundle",
   "test",
   "plugins",
   "scripts",

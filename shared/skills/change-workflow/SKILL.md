@@ -1,7 +1,7 @@
 ---
 name: change-workflow
 description: Use when preparing a durable change to MyAgent (a profile, skill, schedule, plugin, or validator rule) and proposing it as a pull request on MyAgent's repository, from the owner console.
-version: 0.1.0
+version: 0.2.0
 author: Your team
 metadata:
   hermes:
@@ -38,9 +38,10 @@ mise trust && mise install && mise run setup
    on, or push to, the default branch.
 2. Read `AGENTS.md` and the documents it points to before editing. Answer Hermes behaviour
    questions from Hermes source at the deployed release and cite file and line.
-3. Keep the change small and coherent. A new fleet rule goes into `src/fleet-rules.ts` and
-   `scripts/host_rules.py` with the same meaning. Bump a profile's `distribution.yaml` version
-   when its files change.
+3. Keep the change small and coherent. Anything project-specific (MCP servers and tools,
+   credentials, restricted paths) goes in the `policy` block of `profiles/fleet.yaml`;
+   `src/fleet-rules.ts` and `scripts/reconcile.sh` stay generic. Bump a profile's
+   `distribution.yaml` version when its files change.
 4. Run `mise run check`. Fix every failure you caused; report any you did not.
 5. Commit, push the branch, and open a pull request whose body says what changes, why, which
    release path it needs (fleet, host, or runtime), and how to test it in Slack.

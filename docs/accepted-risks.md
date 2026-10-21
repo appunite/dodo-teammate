@@ -11,7 +11,7 @@ The entries below are the template's defaults. Keep, change, or remove each one 
 - **Relaxes:** profiles people can message hold no write credentials.
 - **Why:** approval prompts flood threads, and filing issues from a thread is the most useful thing
   a team agent does.
-- **Controls:** the user allowlist; `reviewed_writes` lists exactly `save_issue` and `save_comment`;
+- **Controls:** the user allowlist; the policy's Linear `writes` are exactly `save_issue` and `save_comment`, for `myagent-slack` only;
   no delete tools anywhere; a key scoped to one team; the skill reports every write in the thread.
 - **Accepted by:** &lt;owner&gt;, &lt;date&gt;.
 

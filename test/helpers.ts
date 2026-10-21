@@ -26,9 +26,9 @@ export function mutatedCheckout(edits: Record<string, Mutation>): {
   });
   for (const [file, edit] of Object.entries(edits)) {
     const path = join(root, file);
-    const document = parse(readFileSync(path, "utf8"));
+    const document = parse(readFileSync(path, "utf8"), { version: "1.1" });
     edit(document);
-    writeFileSync(path, stringify(document));
+    writeFileSync(path, stringify(document, { lineWidth: 0 }));
   }
   return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }

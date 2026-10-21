@@ -18,8 +18,9 @@ normal Git review path for changing it.
   `distribution.yaml`, `README.md`, and any plugins, cron jobs, and scripts it ships;
 - `profiles/fleet.yaml`, the fleet manifest;
 - skills in `shared/skills/`, selected per profile;
-- the fleet contract (`src/fleet-rules.ts`), its host-side twin (`scripts/host_rules.py`), the
-  reconciler, and their tests;
+- `profiles/fleet.yaml`'s `policy`: everything project-specific the fleet contract checks;
+- the fleet contract (`src/fleet-rules.ts`), its bundling for the host, the reconciler, and their
+  tests;
 - capability specs (`docs/capabilities/`) and the accepted-risk list (`docs/accepted-risks.md`);
 - the *names* of the credentials each profile holds, never the values.
 
@@ -46,15 +47,25 @@ If both answers are no, it probably does not belong here.
   how allowlists and environment overrides combine, who may click an approval. Read the code at the
   release you run and cite file and line in the change. Confirm a module or config key exists in
   the Hermes build on the host before a plugin or script relies on it.
-- **Every boundary rule is enforced twice.** `src/fleet-rules.ts` runs in CI; `scripts/host_rules.py`
-  re-checks the release on the host before the reconciler touches it. A boundary rule added to one
-  is added to the other with the same meaning, with a case in `test/parity.test.ts`.
-- **The reconciler and `host_rules.py` ship with the host, not with the release.** A merged change
-  to them takes effect only when your infrastructure workflow installs them, so a profile change
-  can never rewrite the code that checks it.
+- **One validator, run twice.** `src/fleet-rules.ts` is the only implementation of the fleet
+  contract. CI runs it (`mise run fleet`); the reconciler runs the same code on the host from a
+  bundle (`mise run build-validator` writes `dist/validate-fleet.js` and its SHA-256) before it
+  changes anything. `mise run fleet-bundle` checks the bundle is reproducible and accepts the
+  checkout. The validator accepts exactly one fleet schema; to go back, revert and reinstall.
+- **The validator and the reconciler know nothing about this project.** They hold only generic
+  rules and Hermes facts: never a project's profile names, MCP URLs, tool lists, credential names,
+  or paths. Everything project-specific lives in the `policy` block of `profiles/fleet.yaml`: the
+  reviewed MCP servers with their tools, writes and writers, and restricted tools; every credential
+  with the profiles that may hold it and where it may go; restricted paths; the timezone. A new
+  capability changes the policy, not the validator; change the validator only for a new kind of
+  rule, and keep it generic. The policy deploys with the profiles, so widening it is a reviewed
+  change like any other in that file.
+- **The validator bundle and the reconciler ship with the host, not with the release.** Your
+  infrastructure installs both by hash, so a profile change can never rewrite the code that checks
+  it; a change to either takes effect only when your infrastructure installs it.
 - **Prompts are not boundaries.** `SOUL.md` and skills guide behaviour. The enforceable controls
   are the Slack allowlists, the gateway kind (`slack_outbound` has no ingress), per-surface
-  toolsets, MCP tool allowlists, `reviewed_writes`, credential names, run limits, cron schedules
+  toolsets, the policy's MCP servers and credentials, run limits, cron schedules
   and delivery targets, the exact `plugins.enabled`, and the hand-off code. Put a safety property
   in validated config, not only in prose.
 - **Roles decide reach.** `owner`: one user, DM only, may keep memory, web, and a shell. `team`:
@@ -65,8 +76,9 @@ If both answers are no, it probably does not belong here.
   credentials, or a heavy skill is never added to the team profile. It becomes a worker profile, a
   typed `handoff_<name>` tool in the hand-off plugin, an entry in `workers.json`, the worker in
   the default profile's `kanban.dispatch_profiles`, and a capability spec.
-- **Writes are bounded by reviewed lists.** A tool that writes appears in a profile only when
-  `reviewed_writes` lists it for that profile and server. No profile loads a delete tool.
+- **Writes are bounded by the reviewed policy.** A tool that writes appears in a profile only when
+  its server's `writes` in the policy lists it and its `writers` list the profile. No profile loads
+  a delete tool, and the team profile never loads a server's `restricted` tools.
 - **Accepted risks are stated once.** When a design relaxes a rule, write the risk and its controls
   in `docs/accepted-risks.md` and in the capability spec.
 
@@ -76,5 +88,5 @@ If both answers are no, it probably does not belong here.
 mise run check
 ```
 
-`mise run test` also runs `scripts/host_rules.py` with `/usr/bin/python3`, which needs PyYAML
-(`python3-yaml` on Ubuntu); set `HOST_PYTHON` to use another interpreter.
+`mise run test` covers the contract in memory and through the validator CLI. Hermes reads YAML with
+PyYAML (YAML 1.1), and so does the validator: write lists of URLs that contain `?` as block lists.

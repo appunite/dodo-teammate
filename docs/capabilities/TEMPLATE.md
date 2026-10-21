@@ -31,8 +31,15 @@ The skill that tells the model how to do the job, and the profiles that select i
 |---|---|---|---|---|
 | `NAME_TOKEN` | `myagent-…` | who issued it | read-only? which projects or teams? | where to rotate it |
 
-The MCP servers and the exact tools each loads. Every write tool listed here also goes into
-`reviewed_writes`.
+The MCP servers and the exact tools each loads.
+
+**Policy entries** (`profiles/fleet.yaml` `policy`; the validator itself does not change):
+
+- `mcp_servers`: each server's exact URL (or command), its `tools`, its `writes` and the `writers`
+  that may load them, and any `restricted` tools the team profile must never load;
+- `credentials`: each credential, the `profiles` that may hold it, and either `header` with its
+  `urls` or `script: true` (with `copy_of` for a copy of a gateway key);
+- `restricted_paths`: any path only some files may name (where a write key lives on the host).
 
 ## Rules
 
