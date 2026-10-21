@@ -26,4 +26,9 @@ while IFS= read -r path; do
   git mv "${path}" "${parent}/${base//myagent/${name}}"
 done < <(git ls-files | grep -o '^.*myagent[^/]*' | sort -u -r)
 
+# Names of a different length can reflow lines; let the formatter settle them.
+if command -v bun >/dev/null && test -d node_modules; then
+  bun run format >/dev/null
+fi
+
 echo "Renamed the agent to ${title}. Review with git status and git diff, then run mise run check."
