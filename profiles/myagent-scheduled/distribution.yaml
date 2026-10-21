@@ -1,0 +1,11 @@
+name: myagent-scheduled
+version: 0.1.0
+description: "Runs the agent's reviewed schedules as the team app, with no Slack ingress."
+author: Your team
+license: Proprietary
+distribution_owned:
+  - SOUL.md
+  - config.yaml
+  - README.md
+  - cron/jobs.json
+  - scripts

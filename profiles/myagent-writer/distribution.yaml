@@ -1,0 +1,10 @@
+name: myagent-writer
+version: 0.1.0
+description: "Writes a Markdown document from a hand-off and returns it to the Slack thread that asked."
+author: Your team
+license: Proprietary
+distribution_owned:
+  - SOUL.md
+  - config.yaml
+  - README.md
+  - plugins

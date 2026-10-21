@@ -1,0 +1,68 @@
+platform_toolsets:
+  cli: [clarify, web, vision, skills, todo, memory, session_search, no_mcp]
+  api_server: [clarify, web, vision, skills, todo, memory, session_search, no_mcp]
+  slack: [no_mcp]
+  cron: [no_mcp]
+agent:
+  # Every built-in toolset no surface selects. The reconciler adds whatever the installed Hermes
+  # knows on top, so a toolset a new release adds is never switched on silently.
+  disabled_toolsets:
+    - bot_room
+    - browser
+    - code_execution
+    - computer_use
+    - connections
+    - context_engine
+    - cronjob
+    - delegation
+    - desktop_ui
+    - discord
+    - discord_admin
+    - feishu_doc
+    - feishu_drive
+    - file
+    - homeassistant
+    - image_gen
+    - kanban
+    - project
+    - search
+    - setup
+    - spotify
+    - stt
+    - terminal
+    - tts
+    - video
+    - video_gen
+    - x_search
+    - yuanbao
+  max_turns: 50
+mcp_servers: {}
+# Exactly the plugins this profile ships; an absent key would let Hermes keep installed ones
+# (Dodo: profiles/*/config.yaml).
+plugins:
+  enabled: []
+skills:
+  external_dirs:
+    - /var/lib/hermes/.myagent-deployment/skills/default
+security:
+  redact_secrets: true
+# Host-wide Slack policy: Hermes reads these only from the default profile, for every gateway
+# (Dodo: profiles/default/config.yaml).
+slack:
+  allow_admin_from: [U000OWNER]
+  group_allow_admin_from: [U000OWNER]
+  user_allowed_commands: [new]
+  group_user_allowed_commands: [new]
+  unauthorized_dm_behavior: ignore
+max_concurrent_sessions: 4
+timezone: UTC
+# The dispatcher claims tasks only for the declared Kanban workers, one at a time each, and never
+# decomposes or auto-reviews cards with a side model.
+kanban:
+  dispatch_profiles: [myagent-writer]
+  max_in_progress_per_profile: 1
+  auto_decompose: false
+  review_dispatch: false
+terminal:
+  backend: local
+  home_mode: auto

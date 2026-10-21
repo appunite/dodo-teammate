@@ -1,0 +1,9 @@
+name: myagent-admin
+version: 0.1.0
+description: "The owner's private console: operate the agent, try capabilities, and propose changes to this repository as pull requests."
+author: Your team
+license: Proprietary
+distribution_owned:
+  - SOUL.md
+  - config.yaml
+  - README.md

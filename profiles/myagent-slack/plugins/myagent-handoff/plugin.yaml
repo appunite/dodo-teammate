@@ -1,0 +1,7 @@
+name: myagent-handoff
+version: 0.1.0
+description: Typed Kanban hand-offs from myagent-slack to the worker profiles the fleet declares, built by reviewed code.
+kind: standalone
+provides_tools:
+  - handoff_result
+  - handoff_document

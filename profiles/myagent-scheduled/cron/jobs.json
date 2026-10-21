@@ -1,0 +1,13 @@
+{
+  "jobs": [
+    {
+      "id": "standup-reminder",
+      "name": "Daily-update reminder",
+      "schedule": "0 12 * * 1-5",
+      "no_agent": true,
+      "script": "standup-reminder.py",
+      "deliver": "local",
+      "failure_deliver": "slack:D000OWNERDM"
+    }
+  ]
+}

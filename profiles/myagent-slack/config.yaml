@@ -1,0 +1,107 @@
+platform_toolsets:
+  cli: [clarify, skills, todo, linear, sentry]
+  api_server: [clarify, skills, todo, linear, sentry]
+  slack: [clarify, skills, todo, myagent_handoff, linear, sentry]
+  cron: [no_mcp]
+agent:
+  disabled_toolsets:
+    - bot_room
+    - browser
+    - code_execution
+    - computer_use
+    - connections
+    - context_engine
+    - cronjob
+    - delegation
+    - desktop_ui
+    - discord
+    - discord_admin
+    - feishu_doc
+    - feishu_drive
+    - file
+    - homeassistant
+    - image_gen
+    - kanban
+    - memory
+    - project
+    - search
+    - session_search
+    - setup
+    - spotify
+    - stt
+    - terminal
+    - tts
+    - video
+    - video_gen
+    - vision
+    - web
+    - x_search
+    - yuanbao
+  # A shared Slack profile: at most 25 turns and 300 seconds a run.
+  max_turns: 25
+  run_budget_seconds: 300
+approvals:
+  mode: manual
+# A profile several people talk to keeps no memory, so nobody sees another person's conversation.
+memory:
+  memory_enabled: false
+  user_profile_enabled: false
+mcp_servers:
+  linear:
+    url: https://mcp.linear.app/mcp
+    strict_redirect_headers: true
+    headers:
+      Authorization: Bearer ${LINEAR_TEAM_TOKEN}
+    tools:
+      include: [list_teams, list_issue_labels, list_issues, get_issue, list_comments, save_issue,
+        save_comment]
+      resources: false
+      prompts: false
+    sampling:
+      enabled: false
+    elicitation:
+      enabled: false
+    trust: full
+    timeout: 60
+  sentry:
+    url: https://mcp.sentry.dev/mcp/example-org?skills=inspect
+    strict_redirect_headers: true
+    headers:
+      Authorization: Bearer ${SENTRY_READ_TOKEN}
+    tools:
+      include: [find_projects, search_issues, search_errors, get_sentry_resource]
+      resources: false
+      prompts: false
+    sampling:
+      enabled: false
+    elicitation:
+      enabled: false
+    trust: full
+    timeout: 120
+# Exactly the plugins this profile ships; an absent key would let Hermes keep installed ones
+# (Dodo: profiles/*/config.yaml).
+plugins:
+  enabled: [myagent-handoff]
+skills:
+  external_dirs:
+    - /var/lib/hermes/.myagent-deployment/skills/myagent-slack
+security:
+  redact_secrets: true
+slack:
+  # The team allowlist: the same user IDs for DMs and channels. Changing it is a pull request.
+  allow_from: [U000TEAM01, U000TEAM02]
+  group_allow_from: [U000TEAM01, U000TEAM02]
+  allowed_channels: [C000TEAM01]
+  require_mention: true
+  allow_bots: none
+  # Slack never fetches a link the agent writes, so a reply cannot leak data through an unfurl.
+  unfurl_links: false
+  unfurl_media: false
+# A finished hand-off's files reach the thread only from Hermes's caches and the Kanban attachment
+# directories, never from a path a worker merely mentions (Dodo: profiles/derek-slack/config.yaml).
+gateway:
+  strict: true
+  trust_recent_files: false
+terminal:
+  backend: local
+  home_mode: auto

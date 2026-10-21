@@ -1,0 +1,65 @@
+platform_toolsets:
+  cli: [skills, todo, no_mcp]
+  api_server: [skills, todo, no_mcp]
+  slack: [no_mcp]
+  cron: [skills, todo, no_mcp]
+agent:
+  disabled_toolsets:
+    - bot_room
+    - browser
+    - clarify
+    - code_execution
+    - computer_use
+    - connections
+    - context_engine
+    - cronjob
+    - delegation
+    - desktop_ui
+    - discord
+    - discord_admin
+    - feishu_doc
+    - feishu_drive
+    - file
+    - homeassistant
+    - image_gen
+    - kanban
+    - memory
+    - project
+    - search
+    - session_search
+    - setup
+    - spotify
+    - stt
+    - terminal
+    - tts
+    - video
+    - video_gen
+    - vision
+    - web
+    - x_search
+    - yuanbao
+  max_turns: 30
+# Unattended runs refuse every dangerous command.
+approvals:
+  cron_mode: deny
+timezone: UTC
+mcp_servers: {}
+# Exactly the plugins this profile ships; an absent key would let Hermes keep installed ones
+# (Dodo: profiles/*/config.yaml).
+plugins:
+  enabled: []
+skills:
+  external_dirs:
+    - /var/lib/hermes/.myagent-deployment/skills/myagent-scheduled
+security:
+  redact_secrets: true
+# Nobody can message this profile; it only switches link previews off for its deliveries.
+slack:
+  unfurl_links: false
+  unfurl_media: false
+terminal:
+  backend: local
+  home_mode: auto
+  # Hermes never passes SLACK_BOT_TOKEN to a script, so the script reads the same value under this
+  # name (Dodo: profiles/derek-scheduled/config.yaml).
+  env_passthrough: [MYAGENT_SLACK_BOT_TOKEN]

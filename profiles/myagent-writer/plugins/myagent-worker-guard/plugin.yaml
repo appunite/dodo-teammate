@@ -1,0 +1,6 @@
+name: myagent-worker-guard
+version: 0.1.0
+description: Confines a Kanban worker's board tools to its own task, and admits only its declared deliverables into its completion.
+kind: standalone
+provides_hooks:
+  - pre_tool_call

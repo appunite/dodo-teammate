@@ -1,0 +1,7 @@
+{
+  "handoff_document": {
+    "assignee": "myagent-writer",
+    "max_runtime_seconds": 900,
+    "max_retries": 1
+  }
+}

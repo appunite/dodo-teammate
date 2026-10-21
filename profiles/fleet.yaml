@@ -1,0 +1,166 @@
+schema_version: 1
+# The agent's name. Every profile is named `<agent_name>-<job>`, the hand-off plugin
+# `<agent_name>-handoff` (toolset `<agent_name>_handoff`), and the worker guard
+# `<agent_name>-worker-guard`. scripts/rename-agent.sh replaces the placeholder `myagent` everywhere.
+agent_name: myagent
+# The owner's Slack user ID. The owner profile's single allowed user, and the only person who may run
+# slash commands. The owner profile's exception to the egress rule holds only while this is its one
+# allowed user.
+owner_slack_id: U000OWNER
+
+# Writes are bounded by this reviewed list, not by skills or prompts. A tool whose name reads as a
+# write (save_, create_, update_, post_, send_, ...) may appear in a profile's tools.include only
+# when it is listed here for that profile and server. delete_* tools are refused everywhere.
+reviewed_writes:
+  - profile: myagent-slack
+    server: linear
+    tools: [save_issue, save_comment]
+    # Accepted risk (docs/accepted-risks.md): the team profile writes issues without an approval
+    # click. Controls: the user allowlist, this list, no delete tools, every write reported.
+
+# The Hermes launch profile. It holds the host-wide Slack policy and the Kanban dispatcher, and no
+# capability credentials.
+default_profile:
+  name: default
+  source: profiles/default
+  role: launch
+  gateway: false
+  kanban_worker: false
+  cron: []
+  delivery_targets: []
+  platform_toolsets:
+    cli: [clarify, web, vision, skills, todo, memory, session_search, no_mcp]
+    api_server: [clarify, web, vision, skills, todo, memory, session_search, no_mcp]
+    slack: [no_mcp]
+    cron: [no_mcp]
+  mcp_servers: {}
+  plugins: {}
+  runtime_env: []
+  skills: [authority-boundaries, evidence-and-provenance, untrusted-input]
+
+profiles:
+  # The owner's private console: a DM-only Slack app with exactly one allowed user. It keeps memory,
+  # web, and a host terminal, which is safe only while the owner alone can reach it.
+  - name: myagent-admin
+    source: profiles/myagent-admin
+    role: owner
+    gateway: slack
+    kanban_worker: false
+    cron: []
+    delivery_targets: []
+    platform_toolsets:
+      cli: [clarify, web, vision, file, terminal, skills, todo, memory, session_search, no_mcp]
+      api_server: [clarify, web, vision, file, terminal, skills, todo, memory, session_search, no_mcp]
+      slack: [clarify, web, vision, file, terminal, skills, todo, memory, session_search, no_mcp]
+      cron: [no_mcp]
+    mcp_servers: {}
+    plugins: {}
+    runtime_env: []
+    skills:
+      - authority-boundaries
+      - change-workflow
+      - evidence-and-provenance
+      - myagent-capabilities
+      - untrusted-input
+
+  # The team's front door: allowlisted teammates, allowed channels, read tools plus one reviewed write
+  # (Linear issues), no memory, no web or vision next to private data, and typed hand-offs to workers.
+  - name: myagent-slack
+    source: profiles/myagent-slack
+    role: team
+    gateway: slack
+    kanban_worker: false
+    cron: []
+    delivery_targets: []
+    platform_toolsets:
+      cli: [clarify, skills, todo, linear, sentry]
+      api_server: [clarify, skills, todo, linear, sentry]
+      slack: [clarify, skills, todo, myagent_handoff, linear, sentry]
+      cron: [no_mcp]
+    mcp_servers:
+      linear:
+        url: https://mcp.linear.app/mcp
+        strict_redirect_headers: true
+        headers:
+          Authorization: Bearer ${LINEAR_TEAM_TOKEN}
+        tools:
+          include: [list_teams, list_issue_labels, list_issues, get_issue, list_comments, save_issue,
+            save_comment]
+          resources: false
+          prompts: false
+        sampling:
+          enabled: false
+        elicitation:
+          enabled: false
+        trust: full
+        timeout: 60
+      sentry:
+        # Replace example-org with your Sentry organisation slug. ?skills=inspect loads read tools only.
+        url: https://mcp.sentry.dev/mcp/example-org?skills=inspect
+        strict_redirect_headers: true
+        headers:
+          Authorization: Bearer ${SENTRY_READ_TOKEN}
+        tools:
+          include: [find_projects, search_issues, search_errors, get_sentry_resource]
+          resources: false
+          prompts: false
+        sampling:
+          enabled: false
+        elicitation:
+          enabled: false
+        trust: full
+        timeout: 120
+    plugins:
+      myagent-handoff:
+        toolset: myagent_handoff
+        tools: [handoff_result, handoff_document]
+    runtime_env: [LINEAR_TEAM_TOKEN, SENTRY_READ_TOKEN]
+    skills:
+      - authority-boundaries
+      - evidence-and-provenance
+      - myagent-capabilities
+      - untrusted-input
+
+  # Reviewed schedules, posting as the team app without Socket Mode: nobody can message it.
+  - name: myagent-scheduled
+    source: profiles/myagent-scheduled
+    role: scheduled
+    gateway: slack_outbound
+    kanban_worker: false
+    cron: [standup-reminder]
+    # The owner's DM with the team app, for failure alerts. Replace with your own DM channel ID.
+    delivery_targets: ["slack:D000OWNERDM"]
+    platform_toolsets:
+      cli: [skills, todo, no_mcp]
+      api_server: [skills, todo, no_mcp]
+      slack: [no_mcp]
+      cron: [skills, todo, no_mcp]
+    mcp_servers: {}
+    plugins: {}
+    # Hermes passes no SLACK_* key to a script, so the script reads the team app's bot token under
+    # this name too (Dodo: infra/src/fleet-contract.ts, slackScriptTokenName).
+    runtime_env: [MYAGENT_SLACK_BOT_TOKEN]
+    skills: [authority-boundaries, untrusted-input]
+
+  # A Kanban worker. Nothing reaches it but a task the team profile's handoff_document builds.
+  - name: myagent-writer
+    source: profiles/myagent-writer
+    role: worker
+    gateway: false
+    kanban_worker:
+      handoff_tool: handoff_document
+      max_runtime_seconds: 900
+      max_retries: 1
+    cron: []
+    delivery_targets: []
+    platform_toolsets:
+      cli: [skills, todo, file, no_mcp]
+      api_server: [no_mcp]
+      slack: [no_mcp]
+      cron: [no_mcp]
+    mcp_servers: {}
+    plugins:
+      myagent-worker-guard:
+        hooks: [pre_tool_call]
+    runtime_env: []
+    skills: [evidence-and-provenance, untrusted-input]

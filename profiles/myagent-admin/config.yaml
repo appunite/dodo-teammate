@@ -1,0 +1,63 @@
+platform_toolsets:
+  cli: [clarify, web, vision, file, terminal, skills, todo, memory, session_search, no_mcp]
+  api_server: [clarify, web, vision, file, terminal, skills, todo, memory, session_search, no_mcp]
+  slack: [clarify, web, vision, file, terminal, skills, todo, memory, session_search, no_mcp]
+  cron: [no_mcp]
+agent:
+  disabled_toolsets:
+    - bot_room
+    - browser
+    - code_execution
+    - computer_use
+    - connections
+    - context_engine
+    - cronjob
+    - delegation
+    - desktop_ui
+    - discord
+    - discord_admin
+    - feishu_doc
+    - feishu_drive
+    - homeassistant
+    - image_gen
+    - kanban
+    - project
+    - search
+    - setup
+    - spotify
+    - stt
+    - tts
+    - video
+    - video_gen
+    - x_search
+    - yuanbao
+  max_turns: 50
+  run_budget_seconds: 900
+approvals:
+  mode: manual
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+mcp_servers: {}
+# Exactly the plugins this profile ships; an absent key would let Hermes keep installed ones
+# (Dodo: profiles/*/config.yaml).
+plugins:
+  enabled: []
+skills:
+  external_dirs:
+    - /var/lib/hermes/.myagent-deployment/skills/myagent-admin
+security:
+  redact_secrets: true
+slack:
+  # Exactly the owner. The validator refuses any other user here, because this profile keeps memory,
+  # web, and a host terminal.
+  allow_from: [U000OWNER]
+  # A channel that does not exist: the adapter drops every event that is not a 1:1 DM
+  # (Dodo: profiles/derek-admin/config.yaml).
+  allowed_channels: [C0000000000]
+  require_mention: true
+  unfurl_links: false
+  unfurl_media: false
+terminal:
+  backend: local
+  home_mode: auto

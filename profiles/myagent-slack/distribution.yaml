@@ -1,0 +1,10 @@
+name: myagent-slack
+version: 0.1.0
+description: "Answers allowlisted teammates in Slack from read-only tools, files and updates issues in the tracker, and hands heavier jobs to worker profiles through typed hand-offs."
+author: Your team
+license: Proprietary
+distribution_owned:
+  - SOUL.md
+  - config.yaml
+  - README.md
+  - plugins
