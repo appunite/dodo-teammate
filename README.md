@@ -1,14 +1,21 @@
-# Teammate template
+# 🦤 Dodo Teammate
+
+[![Reconstruction of a dodo](https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Reconstruction_of_a_dodo.jpg/960px-Reconstruction_of_a_dodo.jpg)](https://commons.wikimedia.org/wiki/File:Reconstruction_of_a_dodo.jpg)
+
+_Photo by [Vera de Kok](https://commons.wikimedia.org/wiki/User:1Veertje), licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)._
+
+> The **dodo** (*Raphus cucullatus*) is an extinct flightless bird that was endemic to Mauritius.
+> This one is alive, lives in your Slack, and only changes through pull requests. 🦤
 
 A starting point for giving a project its own AI teammate: an agent that lives in the team's Slack,
 reads the systems the team works in, runs reviewed schedules, hands heavier jobs to specialised
 workers, and changes only through pull requests to this repository.
 
-It is the common skeleton of a working agent (Derek, built for one client team), with the
+Dodo Teammate is the common skeleton of a working agent (Derek, built for one client team), with the
 client-specific integrations, IDs, and cloud infrastructure removed. It runs on
 [Hermes Agent](https://hermes-agent.nousresearch.com/), an open-source agent runtime.
 
-## Three names, three jobs
+## 🪪 Three names, three jobs
 
 | Name | What it is |
 |---|---|
@@ -19,7 +26,7 @@ client-specific integrations, IDs, and cloud infrastructure removed. It runs on
 Keeping identity apart from runtime means you can change the model or the runtime without losing
 the teammate.
 
-## Principles
+## 🛡️ Principles
 
 1. **Prompts are not boundaries.** Instructions guide behaviour; validated configuration decides
    what is possible. Every property you rely on (who can reach a profile, which tools it loads,
@@ -49,7 +56,7 @@ the teammate.
 8. **Accepted risks are written down.** Safety is a list of decisions with an owner and a reason.
    Start [`docs/accepted-risks.md`](docs/accepted-risks.md) on day one.
 
-## What's in the box
+## 📦 What's in the box
 
 | Path | What it does |
 |---|---|
@@ -65,7 +72,7 @@ the teammate.
 | [`docs/capabilities/`](docs/capabilities/TEMPLATE.md) | The capability spec template and a worked example. |
 | `.claude/skills/` | Claude Code skills for building a capability and deploying it. |
 
-## Three kinds of state
+## 🗂️ Three kinds of state
 
 | Kind | Examples | Source of truth | How it changes |
 |---|---|---|---|
@@ -76,7 +83,7 @@ the teammate.
 Anything the reconciler owns is overwritten on the next deployment, so fixing fleet state on the
 host is never durable.
 
-## Quickstart
+## 🚀 Quickstart
 
 ```sh
 mise install
@@ -103,7 +110,7 @@ Then, before the first deployment:
 Once they are real, switch it to `live` in a pull request; capabilities ship live, with their
 controls in validated config, not in dry-run phases.
 
-## How to add a capability
+## 🧩 How to add a capability
 
 1. Write the spec from [`docs/capabilities/TEMPLATE.md`](docs/capabilities/TEMPLATE.md): trigger,
    profile, tools, credentials, rules, abuse analysis, accepted risks, rollout, verification.
